@@ -117,7 +117,7 @@ There is also:
 - FastAPI  
 - Uvicorn  
 - Pydantic  
-- (Optional) OpenAI SDK for LLM explanations  
+- OpenAI SDK for LLM explanations  (Optional)
 
 **Frontend**
 
