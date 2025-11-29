@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  "https://nutriguide-api-673231842812.us-central1.run.app";
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -12,25 +14,22 @@ function App() {
 
   const [submitting, setSubmitting] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
-  const [view, setView] = useState("quiz"); // "quiz" | "result"
 
-  // NEW: content assistant state
-  const [emailCopy, setEmailCopy] = useState(null);
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [emailError, setEmailError] = useState(null);
+  // "home" | "quiz" | "result"
+  const [view, setView] = useState("home");
 
-  // Admin mode + admin data
-  const [mode, setMode] = useState("customer"); // "customer" | "admin"
+  // "customer" | "admin"
+  const [mode, setMode] = useState("customer");
 
+  // Admin analytics state
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState(null);
   const [adminRecent, setAdminRecent] = useState([]);
   const [segments, setSegments] = useState(null);
-
-  // Filter state for admin
   const [adminFilterProfile, setAdminFilterProfile] = useState("all");
 
-  // Load quiz questions
+  // ------------- DATA FETCH -------------
+
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
@@ -49,10 +48,8 @@ function App() {
     fetchQuestions();
   }, []);
 
-  // Helper to load admin data (used by effect + Refresh button)
   const loadAdminData = async () => {
     if (mode !== "admin") return;
-
     try {
       setAdminLoading(true);
       setAdminError(null);
@@ -79,12 +76,13 @@ function App() {
     }
   };
 
-  // Load admin data whenever we switch into admin mode
   useEffect(() => {
     if (mode === "admin") {
       loadAdminData();
     }
   }, [mode]);
+
+  // ------------- QUIZ LOGIC -------------
 
   const currentQuestion = questions[currentIndex];
 
@@ -112,8 +110,6 @@ function App() {
       setSubmitting(true);
       setError(null);
 
-      console.log("Collected answers:", answers);
-
       const res = await fetch(`${API_BASE}/quiz/recommend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,8 +121,6 @@ function App() {
       }
 
       const data = await res.json();
-      console.log("Recommendation:", data);
-
       setRecommendation(data);
       setView("result");
     } catch (err) {
@@ -143,32 +137,56 @@ function App() {
     setRecommendation(null);
     setView("quiz");
     setError(null);
-    // reset email state as well
-    setEmailCopy(null);
-    setEmailError(null);
-    setEmailLoading(false);
   };
 
-  const isLastQuestion = currentIndex === questions.length - 1;
+  const isLastQuestion =
+    questions.length > 0 && currentIndex === questions.length - 1;
+
+  // ------------- RENDER HELPERS -------------
 
   const renderQuestionInput = (question) => {
     const value = answers[question.id] ?? "";
 
     if (question.type === "single_choice") {
       return (
-        <div>
-          {question.options?.map((opt) => (
-            <label key={opt.id} style={{ display: "block", marginBottom: 8 }}>
-              <input
-                type="radio"
-                name={question.id}
-                value={opt.id}
-                checked={value === opt.id}
-                onChange={(e) => handleChange(question.id, e.target.value)}
-              />
-              <span style={{ marginLeft: 8 }}>{opt.label}</span>
-            </label>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {question.options?.map((opt) => {
+            const selected = value === opt.id;
+            return (
+              <label
+                key={opt.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "12px 14px",
+                  borderRadius: 999,
+                  border: selected
+                    ? "1.5px solid #6366f1"
+                    : "1px solid #e5e7eb",
+                  background: selected ? "rgba(99,102,241,0.06)" : "#ffffff",
+                  boxShadow: selected
+                    ? "0 8px 24px rgba(99,102,241,0.25)"
+                    : "0 2px 6px rgba(15,23,42,0.04)",
+                  cursor: "pointer",
+                  transition:
+                    "background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
+                }}
+              >
+                <input
+                  type="radio"
+                  name={question.id}
+                  value={opt.id}
+                  checked={selected}
+                  onChange={(e) => handleChange(question.id, e.target.value)}
+                  style={{ width: 16, height: 16 }}
+                />
+                <span style={{ fontSize: 14, color: "#111827" }}>
+                  {opt.label}
+                </span>
+              </label>
+            );
+          })}
         </div>
       );
     }
@@ -176,11 +194,30 @@ function App() {
     if (question.type === "multi_choice") {
       const arrValue = Array.isArray(value) ? value : [];
       return (
-        <div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {question.options?.map((opt) => {
             const checked = arrValue.includes(opt.id);
             return (
-              <label key={opt.id} style={{ display: "block", marginBottom: 8 }}>
+              <label
+                key={opt.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "12px 14px",
+                  borderRadius: 16,
+                  border: checked
+                    ? "1.5px solid #6366f1"
+                    : "1px solid #e5e7eb",
+                  background: checked ? "rgba(99,102,241,0.06)" : "#ffffff",
+                  boxShadow: checked
+                    ? "0 8px 24px rgba(99,102,241,0.25)"
+                    : "0 2px 6px rgba(15,23,42,0.04)",
+                  cursor: "pointer",
+                  transition:
+                    "background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={checked}
@@ -190,8 +227,11 @@ function App() {
                       : [...arrValue, opt.id];
                     handleChange(question.id, newValue);
                   }}
+                  style={{ width: 16, height: 16 }}
                 />
-                <span style={{ marginLeft: 8 }}>{opt.label}</span>
+                <span style={{ fontSize: 14, color: "#111827" }}>
+                  {opt.label}
+                </span>
               </label>
             );
           })}
@@ -205,7 +245,14 @@ function App() {
           type="number"
           value={value}
           onChange={(e) => handleChange(question.id, e.target.value)}
-          style={{ padding: 8, width: "100%", maxWidth: 300 }}
+          style={{
+            padding: "10px 12px",
+            width: "100%",
+            maxWidth: 260,
+            borderRadius: 999,
+            border: "1px solid #e5e7eb",
+            fontSize: 14,
+          }}
         />
       );
     }
@@ -216,40 +263,625 @@ function App() {
         rows={3}
         value={value}
         onChange={(e) => handleChange(question.id, e.target.value)}
-        style={{ padding: 8, width: "100%", maxWidth: 400 }}
+        style={{
+          padding: 10,
+          width: "100%",
+          maxWidth: 420,
+          borderRadius: 14,
+          border: "1px solid #e5e7eb",
+          fontSize: 14,
+        }}
         placeholder="Type your answer…"
       />
     );
   };
 
-  // NEW: handler to call content/welcome-email endpoint
-  const handleGenerateEmailCopy = async () => {
-    try {
-      setEmailLoading(true);
-      setEmailError(null);
-      setEmailCopy(null);
+  // ---------- LANDING PAGE ----------
+  const renderHome = () => {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          fontFamily: "system-ui, sans-serif",
+          background:
+            "radial-gradient(circle at top left, #f9fafb 0, #e5e7eb 40%, #f9fafb 100%)",
+        }}
+      >
+        {/* NAVBAR */}
+        <header
+          style={{
+            maxWidth: "100%",
+            margin: "0 auto",
+            padding: "20px 80px 8px",
+            boxSizing: "border-box",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                background: "linear-gradient(135deg, #6366f1, #ec4899)",
+              }}
+            />
+            <div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  letterSpacing: 0.4,
+                  fontSize: 18,
+                }}
+              >
+                NutriGuide
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                  letterSpacing: 1.2,
+                  color: "#6b7280",
+                }}
+              >
+                Daily nutrition, simplified
+              </div>
+            </div>
+          </div>
 
-      const res = await fetch(`${API_BASE}/content/welcome-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quiz: answers,
-          recommendation: recommendation,
-        }),
-      });
+          <nav
+            style={{
+              display: "flex",
+              gap: 20,
+              alignItems: "center",
+              fontSize: 13,
+            }}
+          >
+            <button
+              onClick={() =>
+                document
+                  .getElementById("how-it-works")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "#4b5563",
+              }}
+            >
+              How it works
+            </button>
+            <button
+              onClick={() =>
+                document
+                  .getElementById("science")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "#4b5563",
+              }}
+            >
+              Science
+            </button>
+            <button
+              onClick={() =>
+                document
+                  .getElementById("reviews")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "#4b5563",
+              }}
+            >
+              Parents
+            </button>
 
-      if (!res.ok) {
-        throw new Error(`Content API error: ${res.status}`);
-      }
+            <button
+              onClick={() => setMode("admin")}
+              style={{
+                borderRadius: 999,
+                border: "1px solid #e5e7eb",
+                padding: "6px 12px",
+                fontSize: 12,
+                background: "#ffffff",
+                cursor: "pointer",
+                color: "#6b7280",
+              }}
+            >
+              Admin
+            </button>
 
-      const data = await res.json();
-      setEmailCopy(data);
-    } catch (err) {
-      console.error(err);
-      setEmailError("Could not generate engagement content.");
-    } finally {
-      setEmailLoading(false);
-    }
+            <button
+              onClick={() => setView("quiz")}
+              style={{
+                padding: "8px 18px",
+                borderRadius: 999,
+                border: "none",
+                background: "linear-gradient(135deg, #6366f1, #ec4899)",
+                color: "#fff",
+                fontSize: 14,
+                cursor: "pointer",
+                boxShadow: "0 12px 30px rgba(236,72,153,0.35)",
+              }}
+            >
+              Take quiz
+            </button>
+          </nav>
+        </header>
+
+        {/* HERO */}
+        <main
+          style={{
+            maxWidth: "100%",
+            margin: "0 auto",
+            padding: "40px 80px 80px",
+            boxSizing: "border-box",
+          }}
+        >
+          <section
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 1fr)",
+              gap: 56,
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  background: "#e0f2fe",
+                  fontSize: 11,
+                  color: "#0369a1",
+                  marginBottom: 16,
+                }}
+              >
+                <span>✨ AI-guided daily nutrition</span>
+                <span
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 999,
+                    background: "#0ea5e9",
+                  }}
+                />
+              </div>
+
+              <h1
+                style={{
+                  fontSize: 38,
+                  lineHeight: 1.1,
+                  marginBottom: 16,
+                  color: "#0f172a",
+                }}
+              >
+                Build a vitamin routine that fits{" "}
+                <span style={{ color: "#6366f1" }}>your real life</span>.
+              </h1>
+
+              <p
+                style={{
+                  fontSize: 16,
+                  color: "#4b5563",
+                  maxWidth: 520,
+                  marginBottom: 20,
+                }}
+              >
+                In 2 minutes, our quiz learns about your family’s lifestyle,
+                diets, and goals — then builds a science-backed bundle you’ll
+                actually remember to take.
+              </p>
+
+              <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                <button
+                  onClick={() => setView("quiz")}
+                  style={{
+                    padding: "10px 22px",
+                    borderRadius: 999,
+                    border: "none",
+                    background:
+                      "linear-gradient(135deg, #6366f1, #ec4899)",
+                    color: "#fff",
+                    fontSize: 15,
+                    cursor: "pointer",
+                    boxShadow: "0 18px 40px rgba(79,70,229,0.45)",
+                  }}
+                >
+                  Start your quiz
+                </button>
+                <button
+                  onClick={() =>
+                    document
+                      .getElementById("how-it-works")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: 999,
+                    border: "1px solid #e5e7eb",
+                    background: "#fff",
+                    color: "#4b5563",
+                    fontSize: 14,
+                    cursor: "pointer",
+                  }}
+                >
+                  See how it works
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 20,
+                  fontSize: 12,
+                  color: "#6b7280",
+                  marginTop: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  ⭐⭐⭐⭐⭐ <strong>4.9</strong> average rating from parents
+                </div>
+                <div>Backed by nutritionists & pediatricians</div>
+              </div>
+            </div>
+
+            {/* Right hero "product" card */}
+            <div
+              style={{
+                position: "relative",
+                padding: 24,
+                borderRadius: 28,
+                background:
+                  "radial-gradient(circle at top, #eff6ff 0, #eef2ff 40%, #ffffff 100%)",
+                boxShadow: "0 26px 60px rgba(148,163,184,0.6)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: -40,
+                  background:
+                    "radial-gradient(circle at top left, rgba(236,72,153,0.2), transparent 60%)",
+                  pointerEvents: "none",
+                }}
+              />
+              <div style={{ position: "relative" }}>
+                <div
+                  style={{
+                    width: 180,
+                    height: 220,
+                    borderRadius: 999,
+                    background:
+                      "linear-gradient(160deg, #6366f1, #a855f7)",
+                    margin: "0 auto 12px",
+                  }}
+                />
+                <h3
+                  style={{
+                    textAlign: "center",
+                    margin: "4px 0 4px",
+                    fontSize: 18,
+                  }}
+                >
+                  Your daily bundle
+                </h3>
+                <p
+                  style={{
+                    textAlign: "center",
+                    margin: 0,
+                    fontSize: 13,
+                    color: "#4b5563",
+                  }}
+                >
+                  Built from 15+ possible products, tailored to your quiz
+                  answers.
+                </p>
+
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 10,
+                    fontSize: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>Adult Daily</div>
+                    <div style={{ color: "#6b7280" }}>
+                      Core multivitamin matched to your age group.
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>
+                      Probiotic + Prebiotic
+                    </div>
+                    <div style={{ color: "#6b7280" }}>
+                      Supports digestion, immunity & gut health.
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>Iron + B12 Booster</div>
+                    <div style={{ color: "#6b7280" }}>
+                      For energy, focus & healthy red blood cells.
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      background: "#eff6ff",
+                      border: "1px dashed #93c5fd",
+                    }}
+                  >
+                    <div style={{ color: "#1d4ed8" }}>
+                      + Personalized add-ons based on your quiz.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* HOW IT WORKS */}
+          <section
+            id="how-it-works"
+            style={{ marginTop: 64, marginBottom: 32 }}
+          >
+            <h2 style={{ fontSize: 24, marginBottom: 8 }}>How NutriGuide works</h2>
+            <p style={{ color: "#4b5563", fontSize: 14, marginBottom: 20 }}>
+              No generic bundles. We match products to your profile, goals, and
+              lifestyle — then explain every recommendation in plain English.
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {[
+                {
+                  title: "1. Take the quiz",
+                  body: "Tell us who you’re shopping for, diet, lifestyle, goals, and any allergies.",
+                },
+                {
+                  title: "2. See your bundle",
+                  body: "We score products behind the scenes and build a core bundle + optional add-ons.",
+                },
+                {
+                  title: "3. Read the ‘why’",
+                  body: "An AI-nutritionist explains why each product was chosen, in everyday language.",
+                },
+              ].map((item, i) => (
+                <div
+                  key={item.title}
+                  style={{
+                    padding: 16,
+                    borderRadius: 18,
+                    background: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 8px 24px rgba(148,163,184,0.18)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 999,
+                      background:
+                        "linear-gradient(135deg, #6366f1, #ec4899)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      fontSize: 14,
+                      marginBottom: 10,
+                    }}
+                  >
+                    {i + 1}
+                  </div>
+                  <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>
+                    {item.title}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 13, color: "#4b5563" }}>
+                    {item.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* SCIENCE SECTION */}
+          <section id="science" style={{ marginTop: 48, marginBottom: 32 }}>
+            <h2 style={{ fontSize: 22, marginBottom: 8 }}>
+              Backed by research, explained by AI
+            </h2>
+            <p style={{ fontSize: 14, color: "#4b5563", maxWidth: 620 }}>
+              NutriGuide doesn’t replace your doctor. It helps you ask smarter
+              questions. We map your answers to ingredient research, age-specific
+              needs, and common gaps — then flag any combinations you should
+              double-check with a professional.
+            </p>
+
+            <div
+              style={{
+                marginTop: 16,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 16,
+                  border: "1px solid #e5e7eb",
+                  background: "#ffffff",
+                }}
+              >
+                <strong>Smart safety notes</strong>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}>
+                  The bundle view highlights potential conflicts or “talk to your
+                  doctor” moments for peace of mind.
+                </p>
+              </div>
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 16,
+                  border: "1px solid #e5e7eb",
+                  background: "#ffffff",
+                }}
+              >
+                <strong>No one-size-fits-all</strong>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}>
+                  Different life stages, different goals. The quiz picks a
+                  starting point for your unique routine.
+                </p>
+              </div>
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 16,
+                  border: "1px solid #e5e7eb",
+                  background: "#ffffff",
+                }}
+              >
+                <strong>Transparent scoring</strong>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}>
+                  Every product has a fit score so you can see which items are
+                  “must-haves” vs “nice-to-haves”.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* REVIEWS PREVIEW */}
+          <section id="reviews" style={{ marginTop: 48 }}>
+            <h2 style={{ fontSize: 22, marginBottom: 12 }}>
+              Parents using NutriGuide say…
+            </h2>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {[
+                "“I finally understand why each vitamin is in our routine. The explanation feels like a friendly nutritionist.”",
+                "“We used to guess at the supplement aisle. Now I have a clear, personalized plan — and I can share the notes with our pediatrician.”",
+                "“Love that I can tweak our goals and instantly see how the bundle changes. It feels like having an AI co-pilot for health decisions.”",
+              ].map((quote, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: 16,
+                    borderRadius: 18,
+                    background: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 8px 20px rgba(148,163,184,0.18)",
+                    fontSize: 13,
+                    color: "#374151",
+                  }}
+                >
+                  {quote}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* CTA STRIP */}
+          <section
+            style={{
+              marginTop: 56,
+              padding: 18,
+              borderRadius: 18,
+              background: "linear-gradient(135deg, #6366f1, #ec4899)",
+              color: "#fff",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                Ready in under 2 minutes.
+              </div>
+            </div>
+            <button
+              onClick={() => setView("quiz")}
+              style={{
+                padding: "8px 18px",
+                borderRadius: 999,
+                border: "none",
+                background: "#ffffff",
+                color: "#111827",
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              Start the quiz
+            </button>
+          </section>
+        </main>
+
+        {/* FOOTER */}
+        <footer
+          style={{
+            borderTop: "1px solid #e5e7eb",
+            padding: "16px 24px",
+            fontSize: 12,
+            color: "#9ca3af",
+            textAlign: "center",
+          }}
+        >
+          NutriGuide is not a medical device and does not provide medical
+          advice. Always consult your doctor or pediatrician before making
+          changes to your supplement routine.
+        </footer>
+      </div>
+    );
   };
 
   // ---------- ADMIN VIEW ----------
@@ -266,21 +898,25 @@ function App() {
         style={{
           minHeight: "100vh",
           fontFamily: "system-ui, sans-serif",
-          background: "#f6f7fb",
+          background:
+            "radial-gradient(circle at top left, #1f2937 0, #020617 50%, #020617 100%)",
           display: "flex",
           justifyContent: "center",
           alignItems: "flex-start",
-          paddingTop: 40,
+          padding: 32,
         }}
       >
         <div
           style={{
-            background: "#ffffff",
+            background:
+              "linear-gradient(135deg, rgba(15,23,42,0.96), rgba(17,24,39,0.98))",
+            border: "1px solid rgba(148,163,184,0.35)",
             padding: 24,
-            borderRadius: 16,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+            borderRadius: 22,
+            boxShadow: "0 24px 60px rgba(15,23,42,0.7)",
             width: "100%",
-            maxWidth: 900,
+            maxWidth: 960,
+            color: "#e5e7eb",
           }}
         >
           <div
@@ -292,7 +928,7 @@ function App() {
               gap: 12,
             }}
           >
-            <h1 style={{ margin: 0 }}>Admin dashboard</h1>
+            <h1 style={{ margin: 0, fontSize: 22 }}>Admin dashboard</h1>
 
             <div
               style={{
@@ -302,7 +938,6 @@ function App() {
                 flexWrap: "wrap",
               }}
             >
-              {/* Filter by profile type */}
               <div style={{ fontSize: 13 }}>
                 <label style={{ marginRight: 4 }}>Profile:</label>
                 <select
@@ -311,7 +946,9 @@ function App() {
                   style={{
                     padding: "4px 8px",
                     borderRadius: 999,
-                    border: "1px solid #d1d5db",
+                    border: "1px solid #4b5563",
+                    background: "#020617",
+                    color: "#e5e7eb",
                     fontSize: 13,
                   }}
                 >
@@ -330,29 +967,14 @@ function App() {
                 style={{
                   padding: "6px 10px",
                   borderRadius: 999,
-                  border: "1px solid #d1d5db",
-                  background: "#f9fafb",
+                  border: "1px solid #4b5563",
+                  background: "#020617",
                   cursor: "pointer",
                   fontSize: 13,
+                  color: "#e5e7eb",
                 }}
               >
                 Refresh ↻
-              </button>
-
-              <button
-                onClick={() =>
-                  window.open(`${API_BASE}/admin/export-recent`, "_blank")
-                }
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  border: "1px solid #d1d5db",
-                  background: "#f3f4ff",
-                  cursor: "pointer",
-                  fontSize: 13,
-                }}
-              >
-                Export CSV
               </button>
 
               <button
@@ -361,26 +983,28 @@ function App() {
                   padding: "6px 12px",
                   borderRadius: 999,
                   border: "none",
-                  background: "#111827",
+                  background:
+                    "linear-gradient(135deg, #6366f1, #ec4899)",
                   color: "#fff",
                   cursor: "pointer",
                   fontSize: 13,
                 }}
               >
-                Back to quiz
+                Back to site
               </button>
             </div>
           </div>
 
           {adminLoading && <p>Loading analytics…</p>}
           {adminError && (
-            <p style={{ color: "red", marginBottom: 12 }}>{adminError}</p>
+            <p style={{ color: "#fecaca", marginBottom: 12 }}>
+              {adminError}
+            </p>
           )}
 
-          {/* Segments summary */}
           {segments && !adminLoading && (
             <>
-              <h2 style={{ marginTop: 8 }}>Overview</h2>
+              <h2 style={{ marginTop: 8, fontSize: 18 }}>Overview</h2>
               <div
                 style={{
                   display: "grid",
@@ -389,18 +1013,18 @@ function App() {
                   marginBottom: 16,
                 }}
               >
-                {/* Total recommendations */}
                 <div
                   style={{
                     padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.4)",
+                    background: "rgba(15,23,42,0.9)",
                   }}
                 >
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "#9ca3af",
                       marginBottom: 4,
                     }}
                   >
@@ -411,18 +1035,18 @@ function App() {
                   </div>
                 </div>
 
-                {/* Avg bundle price */}
                 <div
                   style={{
                     padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.4)",
+                    background: "rgba(15,23,42,0.9)",
                   }}
                 >
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "#9ca3af",
                       marginBottom: 4,
                     }}
                   >
@@ -434,7 +1058,7 @@ function App() {
                       : "—"}
                   </div>
                   {segments.avg_products_per_bundle != null && (
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
                       Avg products per bundle:{" "}
                       {segments.avg_products_per_bundle.toFixed
                         ? segments.avg_products_per_bundle.toFixed(1)
@@ -443,18 +1067,18 @@ function App() {
                   )}
                 </div>
 
-                {/* Avg subscription discount */}
                 <div
                   style={{
                     padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.4)",
+                    background: "rgba(15,23,42,0.9)",
                   }}
                 >
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "#9ca3af",
                       marginBottom: 4,
                     }}
                   >
@@ -466,24 +1090,24 @@ function App() {
                       : "—"}
                   </div>
                   {segments.avg_discount_pct != null && (
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
                       Avg discount: {segments.avg_discount_pct}% off
                     </div>
                   )}
                 </div>
 
-                {/* Top profile types */}
                 <div
                   style={{
                     padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.4)",
+                    background: "rgba(15,23,42,0.9)",
                   }}
                 >
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "#9ca3af",
                       marginBottom: 4,
                     }}
                   >
@@ -499,18 +1123,18 @@ function App() {
                     )}
                 </div>
 
-                {/* Top products */}
                 <div
                   style={{
                     padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.4)",
+                    background: "rgba(15,23,42,0.9)",
                   }}
                 >
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "#9ca3af",
                       marginBottom: 4,
                     }}
                   >
@@ -526,51 +1150,14 @@ function App() {
                         </div>
                       ))}
                 </div>
-
-                {/* Risk distribution */}
-                <div
-                  style={{
-                    padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#6b7280",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Risk distribution
-                  </div>
-                  {segments.by_risk_label &&
-                    Object.entries(segments.by_risk_label).map(([k, v]) => (
-                      <div key={k} style={{ fontSize: 13 }}>
-                        {k}: {v}
-                      </div>
-                    ))}
-                  {segments.high_risk_share != null && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#6b7280",
-                        marginTop: 4,
-                      }}
-                    >
-                      High-risk share: {segments.high_risk_share}% of all
-                      bundles
-                    </div>
-                  )}
-                </div>
               </div>
             </>
           )}
 
           {/* Recent recommendations table */}
-          <h2 style={{ marginTop: 16 }}>Recent recommendations</h2>
+          <h2 style={{ marginTop: 16, fontSize: 18 }}>Recent recommendations</h2>
           {(!filteredRecent || filteredRecent.length === 0) && !adminLoading ? (
-            <p style={{ fontSize: 14, color: "#6b7280" }}>
+            <p style={{ fontSize: 14, color: "#9ca3af" }}>
               No recommendations logged yet for this filter. Complete the quiz a
               few times to populate this view.
             </p>
@@ -579,8 +1166,9 @@ function App() {
               style={{
                 maxHeight: 400,
                 overflow: "auto",
-                borderRadius: 12,
-                border: "1px solid #e5e7eb",
+                borderRadius: 16,
+                border: "1px solid rgba(148,163,184,0.4)",
+                background: "rgba(15,23,42,0.9)",
               }}
             >
               <table
@@ -592,7 +1180,7 @@ function App() {
               >
                 <thead
                   style={{
-                    background: "#f9fafb",
+                    background: "#020617",
                     position: "sticky",
                     top: 0,
                     zIndex: 1,
@@ -609,7 +1197,6 @@ function App() {
                     <th style={{ padding: 8, textAlign: "left" }}>Goals</th>
                     <th style={{ padding: 8, textAlign: "left" }}>Products</th>
                     <th style={{ padding: 8, textAlign: "left" }}>Upsell</th>
-                    <th style={{ padding: 8, textAlign: "left" }}>Risk</th>
                     <th style={{ padding: 8, textAlign: "right" }}>
                       Bundle $
                     </th>
@@ -623,8 +1210,8 @@ function App() {
                     <tr
                       key={idx}
                       style={{
-                        borderTop: "1px solid #e5e7eb",
-                        background: idx % 2 ? "#fff" : "#f9fafb",
+                        borderTop: "1px solid rgba(55,65,81,0.7)",
+                        background: idx % 2 ? "#020617" : "#030712",
                       }}
                     >
                       <td style={{ padding: 8, verticalAlign: "top" }}>
@@ -645,12 +1232,6 @@ function App() {
                       <td style={{ padding: 8, verticalAlign: "top" }}>
                         {(rec.upsell || []).join(", ") || "—"}
                       </td>
-
-                      {/* NEW: risk cell */}
-                      <td style={{ padding: 8, verticalAlign: "top" }}>
-                        {rec.risk_label || "—"}
-                      </td>
-
                       <td
                         style={{
                           padding: 8,
@@ -684,13 +1265,10 @@ function App() {
     );
   };
 
-  // If we're in admin mode, show admin dashboard instead of quiz/result
-  if (mode === "admin") {
-    return renderAdminView();
-  }
-
   // ---------- RESULT VIEW ----------
-  if (view === "result" && recommendation) {
+  const renderResultView = () => {
+    if (!recommendation) return null;
+
     const {
       products = [],
       upsell = [],
@@ -713,24 +1291,24 @@ function App() {
         style={{
           minHeight: "100vh",
           fontFamily: "system-ui, sans-serif",
-          background: "#f6f7fb",
+          background:
+            "radial-gradient(circle at top left, #f9fafb 0, #e5e7eb 40%, #f9fafb 100%)",
           display: "flex",
           justifyContent: "center",
           alignItems: "flex-start",
-          paddingTop: 40,
+          padding: 32,
         }}
       >
         <div
           style={{
-            background: "#ffffff",
+            background: "#f9fafb",
             padding: 24,
-            borderRadius: 16,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+            borderRadius: 22,
+            boxShadow: "0 26px 60px rgba(15,23,42,0.3)",
             width: "100%",
-            maxWidth: 640,
+            maxWidth: 720,
           }}
         >
-          {/* Header with Admin button */}
           <div
             style={{
               display: "flex",
@@ -746,9 +1324,11 @@ function App() {
                 padding: "6px 12px",
                 borderRadius: 999,
                 border: "none",
-                background: "#e5e7eb",
+                background:
+                  "linear-gradient(135deg, #6366f1, #ec4899)",
                 cursor: "pointer",
                 fontSize: 13,
+                color: "#fff",
               }}
             >
               Admin
@@ -756,7 +1336,7 @@ function App() {
           </div>
 
           {bundle_summary && (
-            <p style={{ marginTop: 0, marginBottom: 8, color: "#555" }}>
+            <p style={{ marginTop: 0, marginBottom: 8, color: "#4b5563" }}>
               {bundle_summary}
             </p>
           )}
@@ -765,7 +1345,9 @@ function App() {
             <p style={{ marginTop: 0, marginBottom: 16, color: "#111827" }}>
               <strong>
                 Total:{" "}
-                {bundlePrice != null ? `$${bundlePrice.toFixed(2)}` : "—"}
+                {bundlePrice != null
+                  ? `$${bundlePrice.toFixed(2)}`
+                  : "—"}
               </strong>{" "}
               {bundleSubPrice != null && (
                 <>
@@ -781,12 +1363,11 @@ function App() {
             </p>
           )}
 
-          {/* LLM / nutritionist-style explanation */}
           {llm_explanation && (
             <div
               style={{
-                background: "#f9fafb",
-                borderRadius: 12,
+                background: "#eef2ff",
+                borderRadius: 14,
                 padding: 12,
                 marginBottom: 16,
                 border: "1px solid #e5e7eb",
@@ -798,12 +1379,11 @@ function App() {
             </div>
           )}
 
-          {/* Safety notes */}
           {Array.isArray(safety_notes) && safety_notes.length > 0 && (
             <div
               style={{
                 background: "#fef2f2",
-                borderRadius: 12,
+                borderRadius: 14,
                 padding: 12,
                 marginBottom: 16,
                 border: "1px solid #fecaca",
@@ -835,11 +1415,11 @@ function App() {
                 <div
                   key={p.id}
                   style={{
-                    padding: "8px 12px",
-                    borderRadius: 12,
+                    padding: "10px 12px",
+                    borderRadius: 16,
                     border: "1px solid #e5e7eb",
                     marginBottom: 8,
-                    background: idx === 0 ? "#eef2ff" : "#fff",
+                    background: idx === 0 ? "#eef2ff" : "#ffffff",
                   }}
                 >
                   <div
@@ -929,81 +1509,50 @@ function App() {
             </>
           )}
 
-          {/* Engagement content / email copy */}
-          <div style={{ marginTop: 24 }}>
-            <h3>Engagement content</h3>
-            <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-              Use this as a starting point for an email, SMS, or in-app message
-              to explain the bundle to a customer.
-            </p>
-
-            <button
-              onClick={handleGenerateEmailCopy}
-              disabled={emailLoading}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 999,
-                border: "none",
-                background: "#111827",
-                color: "#fff",
-                cursor: emailLoading ? "default" : "pointer",
-                fontSize: 13,
-                marginBottom: 12,
-                marginTop: 8,
-              }}
-            >
-              {emailLoading ? "Generating..." : "Generate email copy"}
-            </button>
-
-            {emailError && (
-              <p style={{ color: "red", fontSize: 13, marginTop: 4 }}>
-                {emailError}
-              </p>
-            )}
-
-            {emailCopy && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid #e5e7eb",
-                  background: "#f9fafb",
-                  fontSize: 13,
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                <div style={{ marginBottom: 8 }}>
-                  <strong>Subject:</strong> {emailCopy.subject}
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <strong>Preview:</strong> {emailCopy.preview_line}
-                </div>
-                <div>
-                  <strong>Body:</strong>
-                  <div style={{ marginTop: 4 }}>{emailCopy.body_text}</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginTop: 24 }}>
+          <div style={{ marginTop: 24, display: "flex", gap: 10 }}>
             <button
               onClick={handleRestart}
               style={{
                 padding: "8px 16px",
                 borderRadius: 999,
                 border: "none",
-                background: "#eee",
+                background: "#e5e7eb",
                 cursor: "pointer",
               }}
             >
-              Start over
+              Adjust my answers
+            </button>
+            <button
+              onClick={() => setView("home")}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 999,
+                border: "none",
+                background: "#ffffff",
+                boxShadow: "0 6px 18px rgba(148,163,184,0.4)",
+                cursor: "pointer",
+              }}
+            >
+              Back to home
             </button>
           </div>
         </div>
       </div>
     );
+  };
+
+  // ---------- ROUTING-LIKE SWITCH ----------
+
+  if (mode === "admin") {
+    return renderAdminView();
+  }
+
+  if (view === "home") {
+    return renderHome();
+  }
+
+  if (view === "result") {
+    return renderResultView();
   }
 
   // ---------- QUIZ VIEW ----------
@@ -1023,29 +1572,33 @@ function App() {
     return <div style={{ padding: 20 }}>No questions available.</div>;
   }
 
+  const totalQuestions = questions.length || 1;
+  const progress = ((currentIndex + 1) / totalQuestions) * 100;
+
   return (
     <div
       style={{
         minHeight: "100vh",
         fontFamily: "system-ui, sans-serif",
-        background: "#f6f7fb",
+        background:
+          "radial-gradient(circle at top left, #f9fafb 0, #e5e7eb 40%, #f9fafb 100%)",
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-start",
-        paddingTop: 40,
+        padding: 32,
       }}
     >
       <div
         style={{
-          background: "#ffffff",
+          background: "#f9fafb",
           padding: 24,
-          borderRadius: 16,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+          borderRadius: 22,
+          boxShadow: "0 26px 60px rgba(15,23,42,0.3)",
           width: "100%",
-          maxWidth: 640,
+          maxWidth: 720,
         }}
       >
-        {/* Header with Admin button */}
+        {/* Header with Admin + Home link */}
         <div
           style={{
             display: "flex",
@@ -1054,34 +1607,81 @@ function App() {
             marginBottom: 8,
           }}
         >
-          <h1 style={{ margin: 0 }}>NutriGuide Quiz</h1>
+          <div>
+            <button
+              onClick={() => setView("home")}
+              style={{
+                border: "none",
+                background: "transparent",
+                padding: 0,
+                margin: 0,
+                cursor: "pointer",
+              }}
+            >
+              <h1 style={{ margin: 0 }}>NutriGuide Quiz</h1>
+            </button>
+            <p
+              style={{
+                margin: "4px 0 0",
+                fontSize: 13,
+                color: "#6b7280",
+              }}
+            >
+              Answer a few quick questions so we can personalize supplement
+              recommendations.
+            </p>
+          </div>
           <button
             onClick={() => setMode("admin")}
             style={{
               padding: "6px 12px",
               borderRadius: 999,
               border: "none",
-              background: "#e5e7eb",
+              background:
+                "linear-gradient(135deg, #6366f1, #ec4899)",
               cursor: "pointer",
               fontSize: 13,
+              color: "#fff",
             }}
           >
             Admin
           </button>
         </div>
 
-        <p style={{ marginBottom: 24, color: "#555" }}>
-          Answer a few quick questions so we can personalize supplement
-          recommendations.
-        </p>
-
-        <div style={{ marginBottom: 16, fontSize: 14, color: "#777" }}>
-          Question {currentIndex + 1} of {questions.length}
+        {/* progress bar */}
+        <div style={{ marginTop: 16, marginBottom: 12 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: "#6b7280",
+              marginBottom: 4,
+            }}
+          >
+            Question {currentIndex + 1} of {questions.length}
+          </div>
+          <div
+            style={{
+              height: 6,
+              borderRadius: 999,
+              background: "#e5e7eb",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${progress}%`,
+                height: "100%",
+                background:
+                  "linear-gradient(135deg, #6366f1, #ec4899)",
+                transition: "width 0.2s ease-out",
+              }}
+            />
+          </div>
         </div>
 
-        <h2 style={{ marginBottom: 12 }}>{currentQuestion.text}</h2>
+        <h2 style={{ marginBottom: 8 }}>{currentQuestion.text}</h2>
         {currentQuestion.help_text && (
-          <p style={{ marginTop: 0, marginBottom: 12, color: "#777" }}>
+          <p style={{ marginTop: 0, marginBottom: 16, color: "#6b7280" }}>
             {currentQuestion.help_text}
           </p>
         )}
@@ -1103,9 +1703,10 @@ function App() {
               borderRadius: 999,
               border: "none",
               background:
-                currentIndex === 0 || submitting ? "#ddd" : "#eee",
+                currentIndex === 0 || submitting ? "#e5e7eb" : "#f3f4f6",
               cursor:
                 currentIndex === 0 || submitting ? "default" : "pointer",
+              fontSize: 14,
             }}
           >
             Back
@@ -1116,12 +1717,15 @@ function App() {
               onClick={handleNext}
               disabled={submitting}
               style={{
-                padding: "8px 16px",
+                padding: "8px 18px",
                 borderRadius: 999,
                 border: "none",
-                background: "#111827",
+                background:
+                  "linear-gradient(135deg, #6366f1, #ec4899)",
                 color: "white",
                 cursor: submitting ? "default" : "pointer",
+                fontSize: 14,
+                boxShadow: "0 12px 30px rgba(236,72,153,0.35)",
               }}
             >
               Next
@@ -1133,17 +1737,19 @@ function App() {
               onClick={handleSubmit}
               disabled={submitting}
               style={{
-                padding: "8px 16px",
+                padding: "8px 18px",
                 borderRadius: 999,
                 border: "none",
                 background:
-                  "linear-gradient(135deg, #4f46e5, #ec4899)",
+                  "linear-gradient(135deg, #6366f1, #ec4899)",
                 color: "white",
                 cursor: submitting ? "default" : "pointer",
                 opacity: submitting ? 0.7 : 1,
+                fontSize: 14,
+                boxShadow: "0 12px 30px rgba(236,72,153,0.35)",
               }}
             >
-              {submitting ? "Generating…" : "Finish Quiz"}
+              {submitting ? "Generating…" : "See my bundle"}
             </button>
           )}
         </div>
