@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
+const API_BASE =import.meta.env.VITE_API_BASE ||
   "https://nutriguide-api-673231842812.us-central1.run.app";
 
 function App() {
