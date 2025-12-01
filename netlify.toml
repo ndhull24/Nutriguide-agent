@@ -1,0 +1,6 @@
+[build]
+  command = "cd frontend/quiz-ui && npm install && npm run build"
+  publish = "frontend/quiz-ui/dist"
+
+[build.environment]
+  NODE_VERSION = "18"
