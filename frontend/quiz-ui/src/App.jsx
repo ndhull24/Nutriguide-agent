@@ -4,7 +4,6 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "https://nutriguide-api-673231842812.us-central1.run.app";
 
-
 function App() {
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
@@ -28,6 +27,11 @@ function App() {
   const [adminRecent, setAdminRecent] = useState([]);
   const [segments, setSegments] = useState(null);
   const [adminFilterProfile, setAdminFilterProfile] = useState("all");
+
+  // Engagement email content assistant
+  const [emailCopy, setEmailCopy] = useState(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState(null);
 
   // ------------- DATA FETCH -------------
 
@@ -124,6 +128,10 @@ function App() {
       const data = await res.json();
       setRecommendation(data);
       setView("result");
+
+      // Clear any previous email state when a new bundle is generated
+      setEmailCopy(null);
+      setEmailError(null);
     } catch (err) {
       console.error(err);
       setError("Could not generate recommendation. Please try again.");
@@ -138,10 +146,43 @@ function App() {
     setRecommendation(null);
     setView("quiz");
     setError(null);
+    setEmailCopy(null);
+    setEmailError(null);
   };
 
   const isLastQuestion =
     questions.length > 0 && currentIndex === questions.length - 1;
+
+  // ------------- EMAIL CONTENT ASSISTANT -------------
+
+  const handleGenerateEmailCopy = async () => {
+    try {
+      setEmailLoading(true);
+      setEmailError(null);
+      setEmailCopy(null);
+
+      const res = await fetch(`${API_BASE}/content/welcome-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quiz: answers,
+          recommendation: recommendation,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Content API error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      setEmailCopy(data);
+    } catch (err) {
+      console.error(err);
+      setEmailError("Could not generate engagement content.");
+    } finally {
+      setEmailLoading(false);
+    }
+  };
 
   // ------------- RENDER HELPERS -------------
 
@@ -493,8 +534,7 @@ function App() {
                     padding: "10px 22px",
                     borderRadius: 999,
                     border: "none",
-                    background:
-                      "linear-gradient(135deg, #6366f1, #ec4899)",
+                    background: "linear-gradient(135deg, #6366f1, #ec4899)",
                     color: "#fff",
                     fontSize: 15,
                     cursor: "pointer",
@@ -567,8 +607,7 @@ function App() {
                     width: 180,
                     height: 220,
                     borderRadius: 999,
-                    background:
-                      "linear-gradient(160deg, #6366f1, #a855f7)",
+                    background: "linear-gradient(160deg, #6366f1, #a855f7)",
                     margin: "0 auto 12px",
                   }}
                 />
@@ -623,9 +662,7 @@ function App() {
                       border: "1px solid #e5e7eb",
                     }}
                   >
-                    <div style={{ fontWeight: 600 }}>
-                      Probiotic + Prebiotic
-                    </div>
+                    <div style={{ fontWeight: 600 }}>Probiotic + Prebiotic</div>
                     <div style={{ color: "#6b7280" }}>
                       Supports digestion, immunity & gut health.
                     </div>
@@ -661,11 +698,10 @@ function App() {
           </section>
 
           {/* HOW IT WORKS */}
-          <section
-            id="how-it-works"
-            style={{ marginTop: 64, marginBottom: 32 }}
-          >
-            <h2 style={{ fontSize: 24, marginBottom: 8 }}>How NutriGuide works</h2>
+          <section id="how-it-works" style={{ marginTop: 64, marginBottom: 32 }}>
+            <h2 style={{ fontSize: 24, marginBottom: 8 }}>
+              How NutriGuide works
+            </h2>
             <p style={{ color: "#4b5563", fontSize: 14, marginBottom: 20 }}>
               No generic bundles. We match products to your profile, goals, and
               lifestyle — then explain every recommendation in plain English.
@@ -707,8 +743,7 @@ function App() {
                       width: 28,
                       height: 28,
                       borderRadius: 999,
-                      background:
-                        "linear-gradient(135deg, #6366f1, #ec4899)",
+                      background: "linear-gradient(135deg, #6366f1, #ec4899)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -759,7 +794,9 @@ function App() {
                 }}
               >
                 <strong>Smart safety notes</strong>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}>
+                <p
+                  style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}
+                >
                   The bundle view highlights potential conflicts or “talk to your
                   doctor” moments for peace of mind.
                 </p>
@@ -773,7 +810,9 @@ function App() {
                 }}
               >
                 <strong>No one-size-fits-all</strong>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}>
+                <p
+                  style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}
+                >
                   Different life stages, different goals. The quiz picks a
                   starting point for your unique routine.
                 </p>
@@ -787,7 +826,9 @@ function App() {
                 }}
               >
                 <strong>Transparent scoring</strong>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}>
+                <p
+                  style={{ margin: "4px 0 0", fontSize: 13, color: "#4b5563" }}
+                >
                   Every product has a fit score so you can see which items are
                   “must-haves” vs “nice-to-haves”.
                 </p>
@@ -890,9 +931,7 @@ function App() {
     const filteredRecent =
       adminFilterProfile === "all"
         ? adminRecent
-        : adminRecent.filter(
-            (rec) => rec.profile_type === adminFilterProfile
-          );
+        : adminRecent.filter((rec) => rec.profile_type === adminFilterProfile);
 
     return (
       <div
@@ -978,14 +1017,31 @@ function App() {
                 Refresh ↻
               </button>
 
+              {/* Export CSV button (from first snippet) */}
+              <button
+                onClick={() =>
+                  window.open(`${API_BASE}/admin/export-recent`, "_blank")
+                }
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  border: "1px solid #4b5563",
+                  background: "#030712",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  color: "#e5e7eb",
+                }}
+              >
+                Export CSV
+              </button>
+
               <button
                 onClick={() => setMode("customer")}
                 style={{
                   padding: "6px 12px",
                   borderRadius: 999,
                   border: "none",
-                  background:
-                    "linear-gradient(135deg, #6366f1, #ec4899)",
+                  background: "linear-gradient(135deg, #6366f1, #ec4899)",
                   color: "#fff",
                   cursor: "pointer",
                   fontSize: 13,
@@ -998,9 +1054,7 @@ function App() {
 
           {adminLoading && <p>Loading analytics…</p>}
           {adminError && (
-            <p style={{ color: "#fecaca", marginBottom: 12 }}>
-              {adminError}
-            </p>
+            <p style={{ color: "#fecaca", marginBottom: 12 }}>{adminError}</p>
           )}
 
           {segments && !adminLoading && (
@@ -1014,6 +1068,7 @@ function App() {
                   marginBottom: 16,
                 }}
               >
+                {/* Total recommendations */}
                 <div
                   style={{
                     padding: 12,
@@ -1036,6 +1091,7 @@ function App() {
                   </div>
                 </div>
 
+                {/* Avg bundle price */}
                 <div
                   style={{
                     padding: 12,
@@ -1068,6 +1124,7 @@ function App() {
                   )}
                 </div>
 
+                {/* Avg subscription net price */}
                 <div
                   style={{
                     padding: 12,
@@ -1097,6 +1154,7 @@ function App() {
                   )}
                 </div>
 
+                {/* Top profile types */}
                 <div
                   style={{
                     padding: 12,
@@ -1124,6 +1182,7 @@ function App() {
                     )}
                 </div>
 
+                {/* Top products */}
                 <div
                   style={{
                     padding: 12,
@@ -1151,12 +1210,54 @@ function App() {
                         </div>
                       ))}
                 </div>
+
+                {/* Risk distribution (from first snippet) */}
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.4)",
+                    background: "rgba(15,23,42,0.9)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Risk distribution
+                  </div>
+                  {segments.by_risk_label &&
+                    Object.entries(segments.by_risk_label).map(
+                      ([k, v]) => (
+                        <div key={k} style={{ fontSize: 13 }}>
+                          {k}: {v}
+                        </div>
+                      )
+                    )}
+                  {segments.high_risk_share != null && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#9ca3af",
+                        marginTop: 4,
+                      }}
+                    >
+                      High-risk share: {segments.high_risk_share}% of all
+                      bundles
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
 
           {/* Recent recommendations table */}
-          <h2 style={{ marginTop: 16, fontSize: 18 }}>Recent recommendations</h2>
+          <h2 style={{ marginTop: 16, fontSize: 18 }}>
+            Recent recommendations
+          </h2>
           {(!filteredRecent || filteredRecent.length === 0) && !adminLoading ? (
             <p style={{ fontSize: 14, color: "#9ca3af" }}>
               No recommendations logged yet for this filter. Complete the quiz a
@@ -1198,12 +1299,11 @@ function App() {
                     <th style={{ padding: 8, textAlign: "left" }}>Goals</th>
                     <th style={{ padding: 8, textAlign: "left" }}>Products</th>
                     <th style={{ padding: 8, textAlign: "left" }}>Upsell</th>
+                    <th style={{ padding: 8, textAlign: "left" }}>Risk</th>
                     <th style={{ padding: 8, textAlign: "right" }}>
                       Bundle $
                     </th>
-                    <th style={{ padding: 8, textAlign: "right" }}>
-                      Sub $
-                    </th>
+                    <th style={{ padding: 8, textAlign: "right" }}>Sub $</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1232,6 +1332,9 @@ function App() {
                       </td>
                       <td style={{ padding: 8, verticalAlign: "top" }}>
                         {(rec.upsell || []).join(", ") || "—"}
+                      </td>
+                      <td style={{ padding: 8, verticalAlign: "top" }}>
+                        {rec.risk_label || "—"}
                       </td>
                       <td
                         style={{
@@ -1279,6 +1382,8 @@ function App() {
       llm_explanation,
       safety_notes = [],
       pricing,
+      risk_label,
+      risk_score,
     } = recommendation;
 
     const hasDetails = product_details && product_details.length > 0;
@@ -1325,8 +1430,7 @@ function App() {
                 padding: "6px 12px",
                 borderRadius: 999,
                 border: "none",
-                background:
-                  "linear-gradient(135deg, #6366f1, #ec4899)",
+                background: "linear-gradient(135deg, #6366f1, #ec4899)",
                 cursor: "pointer",
                 fontSize: 13,
                 color: "#fff",
@@ -1343,12 +1447,10 @@ function App() {
           )}
 
           {pricing && (
-            <p style={{ marginTop: 0, marginBottom: 16, color: "#111827" }}>
+            <p style={{ marginTop: 0, marginBottom: 8, color: "#111827" }}>
               <strong>
                 Total:{" "}
-                {bundlePrice != null
-                  ? `$${bundlePrice.toFixed(2)}`
-                  : "—"}
+                {bundlePrice != null ? `$${bundlePrice.toFixed(2)}` : "—"}
               </strong>{" "}
               {bundleSubPrice != null && (
                 <>
@@ -1361,6 +1463,21 @@ function App() {
                   </span>
                 </>
               )}
+            </p>
+          )}
+
+          {/* Risk summary for this customer (from first snippet) */}
+          {risk_label && (
+            <p
+              style={{
+                marginTop: 0,
+                marginBottom: 12,
+                color: "#b91c1c",
+                fontSize: 13,
+              }}
+            >
+              <strong>Risk of churn:</strong> {risk_label}
+              {typeof risk_score === "number" && ` (${risk_score}/100)`}
             </p>
           )}
 
@@ -1510,6 +1627,64 @@ function App() {
             </>
           )}
 
+          {/* Engagement content / email copy (from first snippet) */}
+          <div style={{ marginTop: 24 }}>
+            <h3>Engagement content</h3>
+            <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+              Use this as a starting point for an email, SMS, or in-app message
+              to explain the bundle to a customer.
+            </p>
+
+            <button
+              onClick={handleGenerateEmailCopy}
+              disabled={emailLoading}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "none",
+                background: "#111827",
+                color: "#fff",
+                cursor: emailLoading ? "default" : "pointer",
+                fontSize: 13,
+                marginBottom: 12,
+                marginTop: 8,
+              }}
+            >
+              {emailLoading ? "Generating..." : "Generate email copy"}
+            </button>
+
+            {emailError && (
+              <p style={{ color: "red", fontSize: 13, marginTop: 4 }}>
+                {emailError}
+              </p>
+            )}
+
+            {emailCopy && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                  fontSize: 13,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                <div style={{ marginBottom: 8 }}>
+                  <strong>Subject:</strong> {emailCopy.subject}
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <strong>Preview:</strong> {emailCopy.preview_line}
+                </div>
+                <div>
+                  <strong>Body:</strong>
+                  <div style={{ marginTop: 4 }}>{emailCopy.body_text}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={{ marginTop: 24, display: "flex", gap: 10 }}>
             <button
               onClick={handleRestart}
@@ -1562,11 +1737,7 @@ function App() {
   }
 
   if (error) {
-    return (
-      <div style={{ padding: 20, color: "red" }}>
-        {error}
-      </div>
-    );
+    return <div style={{ padding: 20, color: "red" }}>{error}</div>;
   }
 
   if (!currentQuestion) {
@@ -1638,8 +1809,7 @@ function App() {
               padding: "6px 12px",
               borderRadius: 999,
               border: "none",
-              background:
-                "linear-gradient(135deg, #6366f1, #ec4899)",
+              background: "linear-gradient(135deg, #6366f1, #ec4899)",
               cursor: "pointer",
               fontSize: 13,
               color: "#fff",
@@ -1672,8 +1842,7 @@ function App() {
               style={{
                 width: `${progress}%`,
                 height: "100%",
-                background:
-                  "linear-gradient(135deg, #6366f1, #ec4899)",
+                background: "linear-gradient(135deg, #6366f1, #ec4899)",
                 transition: "width 0.2s ease-out",
               }}
             />
@@ -1721,8 +1890,7 @@ function App() {
                 padding: "8px 18px",
                 borderRadius: 999,
                 border: "none",
-                background:
-                  "linear-gradient(135deg, #6366f1, #ec4899)",
+                background: "linear-gradient(135deg, #6366f1, #ec4899)",
                 color: "white",
                 cursor: submitting ? "default" : "pointer",
                 fontSize: 14,
@@ -1741,8 +1909,7 @@ function App() {
                 padding: "8px 18px",
                 borderRadius: 999,
                 border: "none",
-                background:
-                  "linear-gradient(135deg, #6366f1, #ec4899)",
+                background: "linear-gradient(135deg, #6366f1, #ec4899)",
                 color: "white",
                 cursor: submitting ? "default" : "pointer",
                 opacity: submitting ? 0.7 : 1,
